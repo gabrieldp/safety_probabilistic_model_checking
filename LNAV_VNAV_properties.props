@@ -1,0 +1,17 @@
+const int flight_phase;
+const double T;
+
+R{"flight_hours"}=? [ C ]
+
+// Probability of eventually going into missed approach due to loss of navigation.
+P=? [ (true) U (phase=8) ]
+
+// Probability of eventually going into approach with misleading information.
+P=? [ (true) U ((phase=5)&(misleading_information)) ]
+
+// Loss of navigation -> major safety objective
+P<1E-5 [ (true) U (phase=8) ]
+
+// Misleading Information -> Major safety objective
+P<1E-5 [ (true) U ((phase=5)&(misleading_information)) ]
+

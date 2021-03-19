@@ -1,0 +1,130 @@
+ctmc
+
+
+// ---------------------------------
+// Aircraft Conditions/Flight Phases
+// ---------------------------------
+// Typical flight duration (in hours)
+const double flight_duration = 1.5;
+
+// Mean times spent on each flight phase (in hours)
+const double time_in_takeoff = 0.01 * flight_duration;
+const double time_in_climb = 0.15 * flight_duration;
+const double time_in_cruise = 0.57 * flight_duration;
+const double time_in_descent = 0.11 * flight_duration;
+const double time_in_approach = 0.15 * flight_duration;
+const double time_in_landing = 0.01 * flight_duration;
+const double time_in_missed_approach = time_in_climb;
+
+module flight_phase
+	// Phases of flight
+	//	0 = preflight
+	// 	1 = takeoff
+	// 	2 = climb
+	// 	3 = cruise
+	// 	4 = descent
+	// 	5 = approach
+	//	6 = alternate approach
+	// 	7 = landing
+	//	8 = missed approach
+	phase: [0..8] init 1;
+
+	// Takeoff to climb
+	[] (phase=1) -> 1/time_in_takeoff : (phase'=2);
+	// Climb to cruise
+	[] (phase=2) -> 1/time_in_climb : (phase'=3);
+	// Cruise to descent
+	[] (phase=3) -> 1/time_in_cruise : (phase'=4);
+	// Descent to approach / alternate approach
+	[] (phase=4) & (!loss_of_navigation) -> 1/time_in_descent : (phase'=5);
+	[] (phase=4) & (loss_of_navigation) -> 1/time_in_descent : (phase'=6);
+	// Approach to landing / missed approach
+	[] (phase=5) & (!loss_of_navigation) -> 1/time_in_approach : (phase'=7);
+	[] (phase=5) & (loss_of_navigation) -> 1E5 : (phase'=8);
+	// Alternate approach to landing
+	[] (phase=6) -> 1/time_in_approach : (phase'=7);
+	// Missed approach to alternate approach
+	[] (phase=8) -> 1/time_in_missed_approach : (phase'=6);
+	// Landing to preflight
+	[] (phase=7) -> 1/time_in_landing : (phase'=0);
+
+endmodule
+
+
+formula in_flight = (phase >= 1 & phase <= 8);
+formula in_approach = (phase = 5);
+
+// Loss of navigation
+formula all_irs_failed = (irs1_failed) & (irs2_failed) & (irs3_failed);
+formula all_fms_failed = (fms1_failed) & (fms2_failed);
+formula pfd1_not_avail = (gnss1_failed) | (fms1_failed) | (all_irs_failed);
+formula pfd2_not_avail = (gnss2_failed) | (fms2_failed) | (all_irs_failed);
+formula loss_of_navigation = (pfd1_not_avail) & (pfd2_not_avail);
+
+// Misleading Information
+formula all_irs_erroneous = (irs1_erroneous) & (irs2_erroneous) & (irs3_erroneous);
+formula pfd1_erroneous = (gnss1_erroneous) | (fms1_erroneous) | (all_irs_erroneous);
+formula pfd2_erroneous = (gnss2_erroneous) | (fms2_erroneous) | (all_irs_erroneous);
+formula misleading_information = (pfd1_erroneous) & (pfd2_erroneous);
+
+// -------------------------------
+// Inertial Reference System (IRS)
+// -------------------------------
+const double irs_failure_rate = 1E-6;
+const double irs_erroneous_rate = 1E-8;
+
+module irs1
+	irs1_failed: bool init false;
+	irs1_erroneous: bool init false;	
+
+	[] true -> irs_failure_rate : (irs1_failed'=true)&(irs1_erroneous'=false);
+	[] (!irs1_failed) -> irs_erroneous_rate : (irs1_erroneous'=true);
+endmodule
+module irs2 = irs1[irs1_failed=irs2_failed, irs1_erroneous=irs2_erroneous] endmodule
+module irs3 = irs1[irs1_failed=irs3_failed, irs1_erroneous=irs3_erroneous] endmodule
+
+
+// -----------------------------------------
+// Global Navigation Satellite System (GNSS)
+// -----------------------------------------
+const double gnss_failure_rate = 1E-4;
+const double gnss_erroneous_rate = 1E-6;
+
+module gnss1
+	gnss1_failed: bool init false;
+	gnss1_erroneous: bool init false;
+
+	[] true -> gnss_failure_rate : (gnss1_failed'=true)&(gnss1_erroneous'=false);
+	[] (!gnss1_failed) -> gnss_erroneous_rate : (gnss1_erroneous'=true);
+endmodule
+module gnss2 = gnss1[gnss1_failed=gnss2_failed, gnss1_erroneous=gnss2_erroneous] endmodule
+
+
+// ------------------------------
+// Flight Management System (FMS)
+// ------------------------------
+const double fms_failure_rate = 1E-6;
+const double fms_erroneous_rate = 1E-7;
+
+module fms1
+	fms1_failed: bool init false;
+	fms1_erroneous: bool init false;
+
+	[] true -> fms_failure_rate : (fms1_failed'=true)&(fms1_erroneous'=false);
+	[] (!fms1_failed) -> fms_erroneous_rate : (fms1_erroneous'=true);
+endmodule
+module fms2 = fms1[fms1_failed=fms2_failed, fms1_erroneous=fms2_erroneous] endmodule
+
+
+
+// ------------------
+// PRISM Cost/Rewards
+// ------------------
+rewards "flight_hours"
+	phase > 0 : 1;
+endrewards
+
+
+
+
+

@@ -1,0 +1,17 @@
+const int flight_phase;
+const double T;
+
+R{"flight_hours"}=? [ C ]
+
+// Probability of eventually losing navigation enroute, on terminal or on approach.
+P=? [ (true) U (enroute_terminal_approach & loss_of_navigation) ]
+
+// Probability of eventually going into enroute, terminal or approach with misleading information.
+P=? [ (true) U ((enroute_terminal_approach)&(misleading_information)) ]
+
+// Loss of navigation major
+P<1E-5 [ (true) U (enroute_terminal_approach & loss_of_navigation) ]
+
+// Misleading information major.
+P<1E-5 [ (true) U ((enroute_terminal_approach)&(misleading_information)) ]
+
